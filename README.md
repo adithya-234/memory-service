@@ -1,19 +1,17 @@
 # Memory Service
 
-A simple service that allows users to store and retrieve personal memories. Think of it as a digital notepad where users can save things they want to remember and easily look them up later.
-
-## Overview
-
-The Memory Service is a FastAPI-based web service framework for personal memory management. Currently implemented features:
-- **Basic API setup**: FastAPI application with proper configuration
-- **Service information**: Root endpoint providing basic service details
+A simple FastAPI service that allows users to store and retrieve personal memories. Think of it as a digital notepad where users can save things they want to remember and easily look them up later.
 
 ## Features
 
-- Basic FastAPI application setup
-- Root endpoint for service information
-- Lightweight and fast
-- Easy to set up and use
+- **Memory Creation**: Store memories with content and automatic timestamp tracking
+- **Memory Retrieval**: Get specific memories by ID
+- **User Identification**: User-based memory storage with required UUID header
+- **Service Information**: Root endpoint providing basic service details
+- **In-memory storage**: Fast access with UUID-based indexing
+- **RESTful API**: Clean API design with proper HTTP methods
+- **Request Validation**: Structured MemoryRequest model for data validation
+- **Testing Infrastructure**: Comprehensive unit test suite with pytest and fixtures
 
 ## Getting Started
 
@@ -52,6 +50,16 @@ uvicorn app.main:app --reload
 ### API Endpoints
 
 - `GET /` - Root endpoint that returns service information
+- `POST /memories` - Create a new memory (requires `user-id` header with UUID format)
+- `GET /memories/{memory_id}` - Retrieve a specific memory by ID
+
+### Testing
+
+Run tests with:
+```bash
+pytest
+```
+
 
 ## Project Goals
 
