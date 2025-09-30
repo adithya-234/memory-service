@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Optional, Any, Annotated
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
-from .memory_service import MemoryService, MemoryData
+from memory_service import MemoryService, MemoryData
 
 
 VERSION = "1.0.0"
