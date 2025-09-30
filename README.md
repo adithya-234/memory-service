@@ -41,10 +41,41 @@ pip install -r requirements.txt
 
 ### Running the Application
 
+#### Option 1: Local Development
 Start the FastAPI server:
 ```bash
 uvicorn app.main:app --reload
 ```
+
+#### Option 2: Docker
+Build and run with Docker:
+```bash
+# Build the Docker image
+docker build -t memory-service .
+
+# Run the container
+docker run -p 8000:8000 memory-service
+```
+
+#### Option 3: Docker Compose
+Use Docker Compose for easier deployment:
+```bash
+# Start the service
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the service
+docker-compose down
+```
+
+### Docker Notes for macOS Users
+
+- **Docker Desktop**: Ensure Docker Desktop is installed and running
+- **Port Mapping**: The service will be available at `http://localhost:8000`
+- **Memory Limits**: Docker Desktop on macOS may have memory limits - adjust in Docker Desktop settings if needed
+- **Performance**: File system performance may be slower than native Linux - use Docker volumes for better performance if storing persistent data
 
 
 ### API Endpoints

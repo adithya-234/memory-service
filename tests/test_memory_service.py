@@ -19,11 +19,11 @@ def test_create_memory(client):
 def test_get_memory(client):
     user = str(uuid4())
 
-    # Create memory
+    
     resp = client.post("/memories", json={"content": "hello"}, headers={"user-id": user})
     memory_id = resp.json()["id"]
 
-    # Get memory
+    
     resp = client.get(f"/memories/{memory_id}")
     assert resp.status_code == 200
     assert resp.json()["content"] == "hello"
