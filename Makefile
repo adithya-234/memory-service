@@ -4,14 +4,14 @@
 build:
 	docker build -t memory-service .
 
-# Run the service locally with Docker Compose
+# Run the service locally with Docker
 run-local:
-	docker-compose up -d
+	docker run -d -p 8000:8000 --name memory-service memory-service
 
 # Stop the local service
 stop-local:
-	docker-compose down
+	docker stop memory-service && docker rm memory-service
 
 # SSH into the running container
 ssh-local:
-	docker-compose exec memory-service /bin/bash
+	docker exec -it memory-service /bin/bash
