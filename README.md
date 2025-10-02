@@ -54,27 +54,6 @@ docker build -t memory-service .
 docker run -p 8000:8000 memory-service
 ```
 
-#### Using Docker Compose
-Start the service with Docker Compose:
-```bash
-docker-compose up
-```
-
-To run in detached mode:
-```bash
-docker-compose up -d
-```
-
-To rebuild and start:
-```bash
-docker-compose up --build
-```
-
-To stop the service:
-```bash
-docker-compose down
-```
-
 #### Using Make Commands
 Build the Docker image:
 ```bash
