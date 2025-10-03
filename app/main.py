@@ -19,9 +19,10 @@ memory_service = MemoryService()
 
 class MemoryRequest(BaseModel):
     content: str
-    
-    
 
+
+class UpdateMemoryRequest(BaseModel):
+    content: str
 
 
 class MemoryResponse(BaseModel):
@@ -30,6 +31,14 @@ class MemoryResponse(BaseModel):
     content: str
     created_at: datetime
     updated_at: datetime
+
+
+class UpdateMemory(BaseModel):
+    content: str
+
+
+class SearchRequest(BaseModel):
+    query: str
 
 
 @app.get("/")
@@ -42,14 +51,16 @@ async def root():
 
 
 @app.post("/memories", response_model=MemoryResponse)
-async def create_memory_endpoint(memory: MemoryRequest, user_id: Annotated[UUID , Header()]):
+async def create_memory_endpoint(
+    memory: MemoryRequest, user_id: Annotated[UUID, Header()]
+):
     memory_data = memory_service.create_memory(user_id, memory.content)
     return MemoryResponse(
         id=memory_data.id,
         user_id=memory_data.user_id,
         content=memory_data.content,
         created_at=memory_data.created_at,
-        updated_at=memory_data.updated_at
+        updated_at=memory_data.updated_at,
     )
 
 
@@ -64,7 +75,19 @@ async def get_memory_endpoint(memory_id: UUID):
         user_id=memory_data.user_id,
         content=memory_data.content,
         created_at=memory_data.created_at,
-        updated_at=memory_data.updated_at
+        updated_at=memory_data.updated_at,
     )
 
 
+@app.put("/memories/{memory_id}", response_model=MemoryResponse)
+async def update_memory_endpoint(memory_id: UUID, memory: UpdateMemoryRequest):
+    memory_data = memory_service.update_memory(memory_id, memory.content)
+    if not memory_data:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return MemoryResponse(
+        id=memory_data.id,
+        user_id=memory_data.user_id,
+        content=memory_data.content,
+        created_at=memory_data.created_at,
+        updated_at=memory_data.updated_at,
+    )

@@ -20,7 +20,9 @@ def test_get_memory(client):
     user = str(uuid4())
 
     # Create memory
-    resp = client.post("/memories", json={"content": "hello"}, headers={"user-id": user})
+    resp = client.post(
+        "/memories", json={"content": "hello"}, headers={"user-id": user}
+    )
     memory_id = resp.json()["id"]
 
     # Get memory

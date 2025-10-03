@@ -26,7 +26,7 @@ class MemoryService:
             user_id=user_id,
             content=content,
             created_at=now,
-            updated_at=now
+            updated_at=now,
         )
 
         self.memories[memory_id] = memory
@@ -34,6 +34,23 @@ class MemoryService:
 
     def get_memory(self, memory_id: UUID) -> Optional[MemoryData]:
         return self.memories.get(memory_id)
+
+    def update_memory(self, memory_id: UUID, content: str) -> Optional[MemoryData]:
+        memory = self.memories.get(memory_id)
+        if not memory:
+            return None
+
+        memory.content = content
+        memory.updated_at = datetime.now(timezone.utc)
+        return memory
+
+    def search_memories(self, user_id: UUID, query: str) -> list[MemoryData]:
+        results = []
+        query_lower = query.lower()
+        for memory in self.memories.values():
+            if memory.user_id == user_id and query_lower in memory.content.lower():
+                results.append(memory)
+        return results
 
     def clear_memories(self):
         self.memories.clear()
