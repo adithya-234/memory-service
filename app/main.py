@@ -33,8 +33,7 @@ class MemoryResponse(BaseModel):
     updated_at: datetime
 
 
-class UpdateMemory(BaseModel):
-    content: str
+
 
 
 class SearchRequest(BaseModel):
@@ -91,3 +90,20 @@ async def update_memory_endpoint(memory_id: UUID, memory: UpdateMemoryRequest):
         created_at=memory_data.created_at,
         updated_at=memory_data.updated_at,
     )
+
+
+@app.post("/memories/search", response_model=list[MemoryResponse])
+async def search_memories_endpoint(
+    search: SearchRequest, user_id: Annotated[UUID, Header()]
+):
+    memories = memory_service.search_memories(user_id, search.query)
+    return [
+        MemoryResponse(
+            id=memory.id,
+            user_id=memory.user_id,
+            content=memory.content,
+            created_at=memory.created_at,
+            updated_at=memory.updated_at,
+        )
+        for memory in memories
+    ]
