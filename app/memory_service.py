@@ -52,5 +52,11 @@ class MemoryService:
                 results.append(memory)
         return results
 
+    def delete_memory(self, memory_id: UUID) -> bool:
+        if memory_id in self.memories:
+            del self.memories[memory_id]
+            return True
+        return False
+
     def clear_memories(self):
         self.memories.clear()

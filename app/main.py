@@ -107,3 +107,11 @@ async def search_memories_endpoint(
         )
         for memory in memories
     ]
+
+
+@app.delete("/memories/{memory_id}")
+async def delete_memory_endpoint(memory_id: UUID):
+    deleted = memory_service.delete_memory(memory_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return {"message": "Memory deleted successfully", "id": str(memory_id)}
