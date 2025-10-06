@@ -33,9 +33,6 @@ class MemoryResponse(BaseModel):
     updated_at: datetime
 
 
-
-
-
 class SearchRequest(BaseModel):
     query: str
 
