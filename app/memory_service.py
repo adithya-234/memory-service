@@ -20,19 +20,20 @@ class MemoryService:
         self._lock = Lock()
 
     def create_memory(self, user_id: UUID, content: str) -> MemoryData:
-        memory_id = uuid4()
-        now = datetime.now(timezone.utc)
+        with self._lock:
+            memory_id = uuid4()
+            now = datetime.now(timezone.utc)
 
-        memory = MemoryData(
-            id=memory_id,
-            user_id=user_id,
-            content=content,
-            created_at=now,
-            updated_at=now,
-        )
+            memory = MemoryData(
+                id=memory_id,
+                user_id=user_id,
+                content=content,
+                created_at=now,
+                updated_at=now,
+            )
 
-        self.memories[memory_id] = memory
-        return memory
+            self.memories[memory_id] = memory
+            return memory
 
     def get_memory(self, memory_id: UUID) -> Optional[MemoryData]:
         return self.memories.get(memory_id)
@@ -48,18 +49,20 @@ class MemoryService:
             return memory
 
     def search_memories(self, user_id: UUID, query: str) -> list[MemoryData]:
-        results = []
-        query_lower = query.lower()
-        for memory in self.memories.values():
-            if memory.user_id == user_id and query_lower in memory.content.lower():
-                results.append(memory)
-        return results
+        with self._lock:
+            results = []
+            query_lower = query.lower()
+            for memory in self.memories.values():
+                if memory.user_id == user_id and query_lower in memory.content.lower():
+                    results.append(memory)
+            return results
 
     def delete_memory(self, memory_id: UUID) -> bool:
-        if memory_id in self.memories:
-            del self.memories[memory_id]
-            return True
-        return False
+        with self._lock:
+            if memory_id in self.memories:
+                del self.memories[memory_id]
+                return True
+            return False
 
     def clear_memories(self):
         self.memories.clear()
