@@ -2,6 +2,7 @@ from typing import Dict, Optional
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from dataclasses import dataclass
+from threading import Lock
 
 
 @dataclass
@@ -16,6 +17,7 @@ class MemoryData:
 class MemoryService:
     def __init__(self):
         self.memories: Dict[UUID, MemoryData] = {}
+        self._lock = Lock()
 
     def create_memory(self, user_id: UUID, content: str) -> MemoryData:
         memory_id = uuid4()
@@ -36,13 +38,14 @@ class MemoryService:
         return self.memories.get(memory_id)
 
     def update_memory(self, memory_id: UUID, content: str) -> Optional[MemoryData]:
-        memory = self.memories.get(memory_id)
-        if not memory:
-            return None
+        with self._lock:
+            memory = self.memories.get(memory_id)
+            if not memory:
+                return None
 
-        memory.content = content
-        memory.updated_at = datetime.now(timezone.utc)
-        return memory
+            memory.content = content
+            memory.updated_at = datetime.now(timezone.utc)
+            return memory
 
     def search_memories(self, user_id: UUID, query: str) -> list[MemoryData]:
         results = []

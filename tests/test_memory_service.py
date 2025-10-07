@@ -56,7 +56,7 @@ def test_search_memories(client):
     )
     assert resp.status_code == 200
     results = resp.json()
-    assert len(results) > 0
+    assert len(results) == 1
     assert any("pizza" in memory["content"].lower() for memory in results)
 
 
