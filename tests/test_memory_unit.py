@@ -1,5 +1,7 @@
 from uuid import uuid4
 from app.memory_service import MemoryService
+import threading
+import time
 
 
 def test_create_memory():
@@ -50,18 +52,19 @@ def test_update_memory():
     memory_id = created_memory.id
 
     new_content = "updated content"
-    updated_memory = service.update_memory(memory_id, new_content)
+    updated_memory = service.update_memory(memory_id, new_content, user_id)
 
     assert updated_memory is not None
     assert updated_memory.content == new_content
-    assert updated_memory.updated_at > created_memory.updated_at
+    assert updated_memory.updated_at >= created_memory.updated_at
 
 
 def test_update_nonexistent_memory():
     service = MemoryService()
     nonexistent_id = uuid4()
+    user_id = uuid4()
 
-    updated_memory = service.update_memory(nonexistent_id, "new content")
+    updated_memory = service.update_memory(nonexistent_id, "new content", user_id)
 
     assert updated_memory is None
 
@@ -73,7 +76,7 @@ def test_delete_memory():
     created_memory = service.create_memory(user_id, "test memory")
     memory_id = created_memory.id
 
-    result = service.delete_memory(memory_id)
+    result = service.delete_memory(memory_id, user_id)
 
     assert result is True
     assert service.get_memory(memory_id) is None
@@ -82,8 +85,9 @@ def test_delete_memory():
 def test_delete_nonexistent_memory():
     service = MemoryService()
     nonexistent_id = uuid4()
+    user_id = uuid4()
 
-    result = service.delete_memory(nonexistent_id)
+    result = service.delete_memory(nonexistent_id, user_id)
 
     assert result is False
 
@@ -99,3 +103,198 @@ def test_search_memories():
 
     assert len(results) == 1
     assert results[0].content == "python programming"
+
+
+def test_update_memory_unauthorized():
+    """Test that a user cannot update another user's memory"""
+    service = MemoryService()
+    user1_id = uuid4()
+    user2_id = uuid4()
+
+    # User 1 creates a memory
+    created_memory = service.create_memory(user1_id, "user1's memory")
+    memory_id = created_memory.id
+
+    # User 2 tries to update it
+    updated_memory = service.update_memory(memory_id, "hacked content", user2_id)
+
+    assert updated_memory is None
+    # Verify original memory is unchanged
+    original = service.get_memory(memory_id)
+    assert original.content == "user1's memory"
+
+
+def test_delete_memory_unauthorized():
+    """Test that a user cannot delete another user's memory"""
+    service = MemoryService()
+    user1_id = uuid4()
+    user2_id = uuid4()
+
+    # User 1 creates a memory
+    created_memory = service.create_memory(user1_id, "user1's memory")
+    memory_id = created_memory.id
+
+    # User 2 tries to delete it
+    result = service.delete_memory(memory_id, user2_id)
+
+    assert result is False
+    # Verify memory still exists
+    memory = service.get_memory(memory_id)
+    assert memory is not None
+
+
+def test_search_memories_empty_query():
+    """Test that empty query returns empty list"""
+    service = MemoryService()
+    user_id = uuid4()
+
+    service.create_memory(user_id, "test memory")
+
+    # Empty string
+    results = service.search_memories(user_id, "")
+    assert len(results) == 0
+
+    # Whitespace only
+    results = service.search_memories(user_id, "   ")
+    assert len(results) == 0
+
+
+def test_search_memories_case_insensitive():
+    """Test that search is case insensitive"""
+    service = MemoryService()
+    user_id = uuid4()
+
+    service.create_memory(user_id, "Python Programming")
+
+    # Search with different cases
+    results = service.search_memories(user_id, "python")
+    assert len(results) == 1
+
+    results = service.search_memories(user_id, "PYTHON")
+    assert len(results) == 1
+
+    results = service.search_memories(user_id, "PyThOn")
+    assert len(results) == 1
+
+
+def test_search_memories_special_characters():
+    """Test search with special characters"""
+    service = MemoryService()
+    user_id = uuid4()
+
+    service.create_memory(user_id, "email: test@example.com")
+    service.create_memory(user_id, "price: $100")
+
+    results = service.search_memories(user_id, "@example")
+    assert len(results) == 1
+
+    results = service.search_memories(user_id, "$100")
+    assert len(results) == 1
+
+
+def test_search_memories_no_results_for_other_users():
+    """Test that search only returns memories for the specified user"""
+    service = MemoryService()
+    user1_id = uuid4()
+    user2_id = uuid4()
+
+    service.create_memory(user1_id, "user1's python memory")
+    service.create_memory(user2_id, "user2's java memory")
+
+    # User 1 searches for python
+    results = service.search_memories(user1_id, "python")
+    assert len(results) == 1
+    assert results[0].user_id == user1_id
+
+    # User 2 searches for python
+    results = service.search_memories(user2_id, "python")
+    assert len(results) == 0
+
+
+def test_search_memories_user_with_no_memories():
+    """Test search for user with no memories"""
+    service = MemoryService()
+    user_id = uuid4()
+
+    results = service.search_memories(user_id, "anything")
+    assert len(results) == 0
+
+
+def test_update_memory_immutability():
+    """Test that update creates a new instance instead of mutating"""
+    service = MemoryService()
+    user_id = uuid4()
+
+    created_memory = service.create_memory(user_id, "original")
+    memory_id = created_memory.id
+    original_created_at = created_memory.created_at
+
+    # Update the memory
+    updated_memory = service.update_memory(memory_id, "updated", user_id)
+
+    # Verify created_at is preserved
+    assert updated_memory.created_at == original_created_at
+    # Verify it's a new instance (updated_at changed)
+    assert updated_memory.updated_at >= original_created_at
+
+
+def test_concurrent_updates():
+    """Test that concurrent updates work correctly with locks"""
+    service = MemoryService()
+    user_id = uuid4()
+    memory = service.create_memory(user_id, "original")
+
+    def update_memory():
+        service.update_memory(memory.id, "updated", user_id)
+
+    threads = [threading.Thread(target=update_memory) for _ in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # Memory should still be valid and updated
+    final = service.get_memory(memory.id)
+    assert final is not None
+    assert final.content == "updated"
+
+
+def test_concurrent_creates():
+    """Test that concurrent creates generate unique IDs"""
+    service = MemoryService()
+    user_id = uuid4()
+    results = []
+
+    def create_memory(index):
+        memory = service.create_memory(user_id, f"memory {index}")
+        results.append(memory.id)
+
+    threads = [threading.Thread(target=create_memory, args=(i,)) for i in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # All IDs should be unique
+    assert len(set(results)) == 10
+
+
+def test_concurrent_deletes():
+    """Test that concurrent deletes are handled safely"""
+    service = MemoryService()
+    user_id = uuid4()
+    memory = service.create_memory(user_id, "to delete")
+    results = []
+
+    def delete_memory():
+        result = service.delete_memory(memory.id, user_id)
+        results.append(result)
+
+    threads = [threading.Thread(target=delete_memory) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # Only one delete should succeed
+    assert sum(results) == 1

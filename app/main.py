@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Optional, Any, Annotated
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
-from .memory_service import MemoryService, MemoryData
+from memory_service import MemoryService, MemoryData
 
 
 VERSION = "1.0.0"
@@ -21,10 +21,6 @@ class MemoryRequest(BaseModel):
     content: str
 
 
-class UpdateMemoryRequest(BaseModel):
-    content: str
-
-
 class MemoryResponse(BaseModel):
     id: UUID
     user_id: UUID
@@ -39,6 +35,7 @@ class SearchRequest(BaseModel):
 
 @app.get("/")
 async def root():
+    """Root endpoint returning service information."""
     return {
         "message": "Welcome to the Memory Service",
         "service": "memory-service",
@@ -50,6 +47,7 @@ async def root():
 async def create_memory_endpoint(
     memory: MemoryRequest, user_id: Annotated[UUID, Header()]
 ):
+    """Create a new memory for the user."""
     memory_data = memory_service.create_memory(user_id, memory.content)
     return MemoryResponse(
         id=memory_data.id,
@@ -62,6 +60,7 @@ async def create_memory_endpoint(
 
 @app.get("/memories/{memory_id}", response_model=MemoryResponse)
 async def get_memory_endpoint(memory_id: UUID):
+    """Retrieve a memory by its ID."""
     memory_data = memory_service.get_memory(memory_id)
     if not memory_data:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -76,8 +75,13 @@ async def get_memory_endpoint(memory_id: UUID):
 
 
 @app.put("/memories/{memory_id}", response_model=MemoryResponse)
-async def update_memory_endpoint(memory_id: UUID, memory: UpdateMemoryRequest):
-    memory_data = memory_service.update_memory(memory_id, memory.content)
+async def update_memory_endpoint(
+    memory_id: UUID,
+    memory: MemoryRequest,
+    user_id: Annotated[UUID, Header()]
+):
+    """Update an existing memory's content."""
+    memory_data = memory_service.update_memory(memory_id, memory.content, user_id)
     if not memory_data:
         raise HTTPException(status_code=404, detail="Memory not found")
     return MemoryResponse(
@@ -93,6 +97,7 @@ async def update_memory_endpoint(memory_id: UUID, memory: UpdateMemoryRequest):
 async def search_memories_endpoint(
     search: SearchRequest, user_id: Annotated[UUID, Header()]
 ):
+    """Search for memories matching the query."""
     memories = memory_service.search_memories(user_id, search.query)
     return [
         MemoryResponse(
@@ -107,8 +112,12 @@ async def search_memories_endpoint(
 
 
 @app.delete("/memories/{memory_id}")
-async def delete_memory_endpoint(memory_id: UUID):
-    deleted = memory_service.delete_memory(memory_id)
+async def delete_memory_endpoint(
+    memory_id: UUID,
+    user_id: Annotated[UUID, Header()]
+):
+    """Delete a memory."""
+    deleted = memory_service.delete_memory(memory_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Memory not found")
-    return {"message": "Memory deleted successfully", "id": str(memory_id)}
+    return {"message": "Memory deleted successfully", "id": memory_id}
