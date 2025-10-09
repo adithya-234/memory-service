@@ -3,3 +3,5 @@ uvicorn==0.24.0
 pydantic==2.5.0
 pytest==7.4.3
 ruff
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23

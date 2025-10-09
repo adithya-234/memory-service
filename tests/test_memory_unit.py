@@ -2,14 +2,20 @@ from uuid import uuid4
 from app.memory_service import MemoryService
 import threading
 import time
+import pytest
 
 
-def test_create_memory():
-    service = MemoryService()
+@pytest.fixture
+def service():
+    """Create a memory service instance."""
+    return MemoryService()
+
+
+def test_create_memory(service, db_session):
     user_id = uuid4()
     content = "test memory"
 
-    memory = service.create_memory(user_id, content)
+    memory = service.create_memory(db_session, user_id, content)
 
     assert memory.content == content
     assert memory.user_id == user_id
@@ -18,15 +24,14 @@ def test_create_memory():
     assert memory.updated_at is not None
 
 
-def test_get_memory():
-    service = MemoryService()
+def test_get_memory(service, db_session):
     user_id = uuid4()
     content = "test memory"
 
-    created_memory = service.create_memory(user_id, content)
+    created_memory = service.create_memory(db_session, user_id, content)
     memory_id = created_memory.id
 
-    retrieved_memory = service.get_memory(memory_id)
+    retrieved_memory = service.get_memory(db_session, memory_id, user_id)
 
     assert retrieved_memory is not None
     assert retrieved_memory.id == memory_id
@@ -34,203 +39,205 @@ def test_get_memory():
     assert retrieved_memory.user_id == user_id
 
 
-def test_get_nonexistent_memory():
-    service = MemoryService()
+def test_get_nonexistent_memory(service, db_session):
     nonexistent_id = uuid4()
+    user_id = uuid4()
 
-    memory = service.get_memory(nonexistent_id)
+    memory = service.get_memory(db_session, nonexistent_id, user_id)
 
     assert memory is None
 
 
-def test_update_memory():
-    service = MemoryService()
+def test_update_memory(service, db_session):
     user_id = uuid4()
     content = "original content"
 
-    created_memory = service.create_memory(user_id, content)
+    created_memory = service.create_memory(db_session, user_id, content)
     memory_id = created_memory.id
 
     new_content = "updated content"
-    updated_memory = service.update_memory(memory_id, new_content, user_id)
+    updated_memory = service.update_memory(db_session, memory_id, new_content, user_id)
 
     assert updated_memory is not None
     assert updated_memory.content == new_content
     assert updated_memory.updated_at >= created_memory.updated_at
 
 
-def test_update_nonexistent_memory():
-    service = MemoryService()
+def test_update_nonexistent_memory(service, db_session):
     nonexistent_id = uuid4()
     user_id = uuid4()
 
-    updated_memory = service.update_memory(nonexistent_id, "new content", user_id)
+    updated_memory = service.update_memory(db_session, nonexistent_id, "new content", user_id)
 
     assert updated_memory is None
 
 
-def test_delete_memory():
-    service = MemoryService()
+def test_delete_memory(service, db_session):
     user_id = uuid4()
 
-    created_memory = service.create_memory(user_id, "test memory")
+    created_memory = service.create_memory(db_session, user_id, "test memory")
     memory_id = created_memory.id
 
-    result = service.delete_memory(memory_id, user_id)
+    result = service.delete_memory(db_session, memory_id, user_id)
 
     assert result is True
-    assert service.get_memory(memory_id) is None
+    assert service.get_memory(db_session, memory_id, user_id) is None
 
 
-def test_delete_nonexistent_memory():
-    service = MemoryService()
+def test_delete_nonexistent_memory(service, db_session):
     nonexistent_id = uuid4()
     user_id = uuid4()
 
-    result = service.delete_memory(nonexistent_id, user_id)
+    result = service.delete_memory(db_session, nonexistent_id, user_id)
 
     assert result is False
 
 
-def test_search_memories():
-    service = MemoryService()
+def test_search_memories(service, db_session):
     user_id = uuid4()
 
-    service.create_memory(user_id, "python programming")
-    service.create_memory(user_id, "java development")
+    service.create_memory(db_session, user_id, "python programming")
+    service.create_memory(db_session, user_id, "java development")
 
-    results = service.search_memories(user_id, "python")
+    results = service.search_memories(db_session, user_id, "python")
 
     assert len(results) == 1
     assert results[0].content == "python programming"
 
 
-def test_update_memory_unauthorized():
-    """Test that a user cannot update another user's memory"""
-    service = MemoryService()
+def test_get_memory_unauthorized(service, db_session):
+    """Test that a user cannot get another user's memory"""
     user1_id = uuid4()
     user2_id = uuid4()
 
     # User 1 creates a memory
-    created_memory = service.create_memory(user1_id, "user1's memory")
+    created_memory = service.create_memory(db_session, user1_id, "user1's memory")
+    memory_id = created_memory.id
+
+    # User 2 tries to get it
+    retrieved_memory = service.get_memory(db_session, memory_id, user2_id)
+
+    assert retrieved_memory is None
+
+
+def test_update_memory_unauthorized(service, db_session):
+    """Test that a user cannot update another user's memory"""
+    user1_id = uuid4()
+    user2_id = uuid4()
+
+    # User 1 creates a memory
+    created_memory = service.create_memory(db_session, user1_id, "user1's memory")
     memory_id = created_memory.id
 
     # User 2 tries to update it
-    updated_memory = service.update_memory(memory_id, "hacked content", user2_id)
+    updated_memory = service.update_memory(db_session, memory_id, "hacked content", user2_id)
 
     assert updated_memory is None
     # Verify original memory is unchanged
-    original = service.get_memory(memory_id)
+    original = service.get_memory(db_session, memory_id, user1_id)
     assert original.content == "user1's memory"
 
 
-def test_delete_memory_unauthorized():
+def test_delete_memory_unauthorized(service, db_session):
     """Test that a user cannot delete another user's memory"""
-    service = MemoryService()
     user1_id = uuid4()
     user2_id = uuid4()
 
     # User 1 creates a memory
-    created_memory = service.create_memory(user1_id, "user1's memory")
+    created_memory = service.create_memory(db_session, user1_id, "user1's memory")
     memory_id = created_memory.id
 
     # User 2 tries to delete it
-    result = service.delete_memory(memory_id, user2_id)
+    result = service.delete_memory(db_session, memory_id, user2_id)
 
     assert result is False
     # Verify memory still exists
-    memory = service.get_memory(memory_id)
+    memory = service.get_memory(db_session, memory_id, user1_id)
     assert memory is not None
 
 
-def test_search_memories_empty_query():
+def test_search_memories_empty_query(service, db_session):
     """Test that empty query returns empty list"""
-    service = MemoryService()
     user_id = uuid4()
 
-    service.create_memory(user_id, "test memory")
+    service.create_memory(db_session, user_id, "test memory")
 
     # Empty string
-    results = service.search_memories(user_id, "")
+    results = service.search_memories(db_session, user_id, "")
     assert len(results) == 0
 
     # Whitespace only
-    results = service.search_memories(user_id, "   ")
+    results = service.search_memories(db_session, user_id, "   ")
     assert len(results) == 0
 
 
-def test_search_memories_case_insensitive():
+def test_search_memories_case_insensitive(service, db_session):
     """Test that search is case insensitive"""
-    service = MemoryService()
     user_id = uuid4()
 
-    service.create_memory(user_id, "Python Programming")
+    service.create_memory(db_session, user_id, "Python Programming")
 
     # Search with different cases
-    results = service.search_memories(user_id, "python")
+    results = service.search_memories(db_session, user_id, "python")
     assert len(results) == 1
 
-    results = service.search_memories(user_id, "PYTHON")
+    results = service.search_memories(db_session, user_id, "PYTHON")
     assert len(results) == 1
 
-    results = service.search_memories(user_id, "PyThOn")
+    results = service.search_memories(db_session, user_id, "PyThOn")
     assert len(results) == 1
 
 
-def test_search_memories_special_characters():
+def test_search_memories_special_characters(service, db_session):
     """Test search with special characters"""
-    service = MemoryService()
     user_id = uuid4()
 
-    service.create_memory(user_id, "email: test@example.com")
-    service.create_memory(user_id, "price: $100")
+    service.create_memory(db_session, user_id, "email: test@example.com")
+    service.create_memory(db_session, user_id, "price: $100")
 
-    results = service.search_memories(user_id, "@example")
+    results = service.search_memories(db_session, user_id, "@example")
     assert len(results) == 1
 
-    results = service.search_memories(user_id, "$100")
+    results = service.search_memories(db_session, user_id, "$100")
     assert len(results) == 1
 
 
-def test_search_memories_no_results_for_other_users():
+def test_search_memories_no_results_for_other_users(service, db_session):
     """Test that search only returns memories for the specified user"""
-    service = MemoryService()
     user1_id = uuid4()
     user2_id = uuid4()
 
-    service.create_memory(user1_id, "user1's python memory")
-    service.create_memory(user2_id, "user2's java memory")
+    service.create_memory(db_session, user1_id, "user1's python memory")
+    service.create_memory(db_session, user2_id, "user2's java memory")
 
     # User 1 searches for python
-    results = service.search_memories(user1_id, "python")
+    results = service.search_memories(db_session, user1_id, "python")
     assert len(results) == 1
     assert results[0].user_id == user1_id
 
     # User 2 searches for python
-    results = service.search_memories(user2_id, "python")
+    results = service.search_memories(db_session, user2_id, "python")
     assert len(results) == 0
 
 
-def test_search_memories_user_with_no_memories():
+def test_search_memories_user_with_no_memories(service, db_session):
     """Test search for user with no memories"""
-    service = MemoryService()
     user_id = uuid4()
 
-    results = service.search_memories(user_id, "anything")
+    results = service.search_memories(db_session, user_id, "anything")
     assert len(results) == 0
 
 
-def test_update_memory_immutability():
+def test_update_memory_immutability(service, db_session):
     """Test that update creates a new instance instead of mutating"""
-    service = MemoryService()
     user_id = uuid4()
 
-    created_memory = service.create_memory(user_id, "original")
+    created_memory = service.create_memory(db_session, user_id, "original")
     memory_id = created_memory.id
     original_created_at = created_memory.created_at
 
     # Update the memory
-    updated_memory = service.update_memory(memory_id, "updated", user_id)
+    updated_memory = service.update_memory(db_session, memory_id, "updated", user_id)
 
     # Verify created_at is preserved
     assert updated_memory.created_at == original_created_at
@@ -238,14 +245,13 @@ def test_update_memory_immutability():
     assert updated_memory.updated_at >= original_created_at
 
 
-def test_concurrent_updates():
-    """Test that concurrent updates work correctly with locks"""
-    service = MemoryService()
+def test_concurrent_updates(service, db_session):
+    """Test that concurrent updates work correctly"""
     user_id = uuid4()
-    memory = service.create_memory(user_id, "original")
+    memory = service.create_memory(db_session, user_id, "original")
 
     def update_memory():
-        service.update_memory(memory.id, "updated", user_id)
+        service.update_memory(db_session, memory.id, "updated", user_id)
 
     threads = [threading.Thread(target=update_memory) for _ in range(10)]
     for t in threads:
@@ -254,19 +260,18 @@ def test_concurrent_updates():
         t.join()
 
     # Memory should still be valid and updated
-    final = service.get_memory(memory.id)
+    final = service.get_memory(db_session, memory.id, user_id)
     assert final is not None
     assert final.content == "updated"
 
 
-def test_concurrent_creates():
+def test_concurrent_creates(service, db_session):
     """Test that concurrent creates generate unique IDs"""
-    service = MemoryService()
     user_id = uuid4()
     results = []
 
     def create_memory(index):
-        memory = service.create_memory(user_id, f"memory {index}")
+        memory = service.create_memory(db_session, user_id, f"memory {index}")
         results.append(memory.id)
 
     threads = [threading.Thread(target=create_memory, args=(i,)) for i in range(10)]
@@ -279,15 +284,14 @@ def test_concurrent_creates():
     assert len(set(results)) == 10
 
 
-def test_concurrent_deletes():
+def test_concurrent_deletes(service, db_session):
     """Test that concurrent deletes are handled safely"""
-    service = MemoryService()
     user_id = uuid4()
-    memory = service.create_memory(user_id, "to delete")
+    memory = service.create_memory(db_session, user_id, "to delete")
     results = []
 
     def delete_memory():
-        result = service.delete_memory(memory.id, user_id)
+        result = service.delete_memory(db_session, memory.id, user_id)
         results.append(result)
 
     threads = [threading.Thread(target=delete_memory) for _ in range(5)]

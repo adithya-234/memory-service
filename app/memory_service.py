@@ -1,8 +1,10 @@
-from typing import Dict, Optional
+from typing import Optional
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from dataclasses import dataclass
-from threading import Lock
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from database import MemoryModel
 
 
 @dataclass
@@ -16,80 +18,107 @@ class MemoryData:
 
 
 class MemoryService:
-    """Service for thread-safe memory operations including create, read, update, delete, and search."""
-    def __init__(self):
-        self.memories: Dict[UUID, MemoryData] = {}
-        self._lock = Lock()
+    """Service for memory operations using PostgreSQL with SQLAlchemy."""
 
-    def create_memory(self, user_id: UUID, content: str) -> MemoryData:
-        with self._lock:
-            memory_id = uuid4()
-            now = datetime.now(timezone.utc)
+    def create_memory(self, db_session: Session, user_id: UUID, content: str) -> MemoryData:
+        """Create a new memory."""
+        memory_id = uuid4()
+        now = datetime.now(timezone.utc)
 
-            memory = MemoryData(
-                id=memory_id,
-                user_id=user_id,
-                content=content,
-                created_at=now,
-                updated_at=now,
-            )
+        db_memory = MemoryModel(
+            id=memory_id,
+            user_id=user_id,
+            content=content,
+            created_at=now,
+            updated_at=now
+        )
 
-            self.memories[memory_id] = memory
-            return memory
+        db_session.add(db_memory)
+        db_session.commit()
+        db_session.refresh(db_memory)
 
-    def get_memory(self, memory_id: UUID) -> Optional[MemoryData]:
-        return self.memories.get(memory_id)
+        return MemoryData(
+            id=db_memory.id,
+            user_id=db_memory.user_id,
+            content=db_memory.content,
+            created_at=db_memory.created_at,
+            updated_at=db_memory.updated_at
+        )
 
-    def update_memory(self, memory_id: UUID, content: str, user_id: UUID) -> Optional[MemoryData]:
+    def get_memory(self, db_session: Session, memory_id: UUID, user_id: UUID) -> Optional[MemoryData]:
+        """Get a memory by ID with authorization check."""
+        db_memory = db_session.query(MemoryModel).filter(
+            MemoryModel.id == memory_id,
+            MemoryModel.user_id == user_id
+        ).first()
+
+        if not db_memory:
+            return None
+
+        return MemoryData(
+            id=db_memory.id,
+            user_id=db_memory.user_id,
+            content=db_memory.content,
+            created_at=db_memory.created_at,
+            updated_at=db_memory.updated_at
+        )
+
+    def update_memory(self, db_session: Session, memory_id: UUID, content: str, user_id: UUID) -> Optional[MemoryData]:
         """Update an existing memory's content with authorization check."""
-        with self._lock:
-            memory = self.memories.get(memory_id)
-            if not memory:
-                return None
+        db_memory = db_session.query(MemoryModel).filter(
+            MemoryModel.id == memory_id,
+            MemoryModel.user_id == user_id
+        ).first()
 
-            # Authorization check: ensure user owns the memory
-            if memory.user_id != user_id:
-                return None
+        if not db_memory:
+            return None
 
-            # Create a new instance instead of mutating the existing one
-            updated_memory = MemoryData(
-                id=memory.id,
-                user_id=memory.user_id,
-                content=content,
-                created_at=memory.created_at,
-                updated_at=datetime.now(timezone.utc)
-            )
-            self.memories[memory_id] = updated_memory
-            return updated_memory
+        db_memory.content = content
+        db_memory.updated_at = datetime.now(timezone.utc)
 
-    def search_memories(self, user_id: UUID, query: str) -> list[MemoryData]:
+        db_session.commit()
+        db_session.refresh(db_memory)
+
+        return MemoryData(
+            id=db_memory.id,
+            user_id=db_memory.user_id,
+            content=db_memory.content,
+            created_at=db_memory.created_at,
+            updated_at=db_memory.updated_at
+        )
+
+    def search_memories(self, db_session: Session, user_id: UUID, query: str) -> list[MemoryData]:
         """Search user's memories using case-insensitive substring matching."""
-        with self._lock:
-            # Validate query - return empty list for empty queries
-            if not query or not query.strip():
-                return []
+        if not query or not query.strip():
+            return []
 
-            results = []
-            query_lower = query.lower()
-            for memory in self.memories.values():
-                if memory.user_id == user_id and query_lower in memory.content.lower():
-                    results.append(memory)
-            return results
+        db_memories = db_session.query(MemoryModel).filter(
+            MemoryModel.user_id == user_id,
+            func.lower(MemoryModel.content).contains(query.lower())
+        ).order_by(MemoryModel.created_at.desc()).all()
 
-    def delete_memory(self, memory_id: UUID, user_id: UUID) -> bool:
+        return [
+            MemoryData(
+                id=mem.id,
+                user_id=mem.user_id,
+                content=mem.content,
+                created_at=mem.created_at,
+                updated_at=mem.updated_at
+            )
+            for mem in db_memories
+        ]
+
+    def delete_memory(self, db_session: Session, memory_id: UUID, user_id: UUID) -> bool:
         """Delete a memory with authorization check."""
-        with self._lock:
-            memory = self.memories.get(memory_id)
-            if not memory:
-                return False
+        result = db_session.query(MemoryModel).filter(
+            MemoryModel.id == memory_id,
+            MemoryModel.user_id == user_id
+        ).delete()
 
-            # Authorization check: ensure user owns the memory
-            if memory.user_id != user_id:
-                return False
+        db_session.commit()
+        return result > 0
 
-            # Use pop for atomic operation
-            self.memories.pop(memory_id)
-            return True
-
-    def clear_memories(self):
-        self.memories.clear()
+    def clear_memories(self, db_session: Session):
+        """Clear all memories - useful for testing."""
+        db_session.query(MemoryModel).delete()
+        db_session.commit()
