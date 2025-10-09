@@ -1,7 +1,6 @@
 from uuid import uuid4
 from app.memory_service import MemoryService
-import threading
-import time
+import asyncio
 import pytest
 
 
@@ -245,60 +244,54 @@ def test_update_memory_immutability(service, db_session):
     assert updated_memory.updated_at >= original_created_at
 
 
-def test_concurrent_updates(service, db_session):
+@pytest.mark.asyncio
+async def test_concurrent_updates(service, db_session):
     """Test that concurrent updates work correctly"""
     user_id = uuid4()
-    memory = service.create_memory(db_session, user_id, "original")
+    memory = await asyncio.to_thread(service.create_memory, db_session, user_id, "original")
 
-    def update_memory():
-        service.update_memory(db_session, memory.id, "updated", user_id)
+    async def update_memory():
+        await asyncio.to_thread(service.update_memory, db_session, memory.id, "updated", user_id)
 
-    threads = [threading.Thread(target=update_memory) for _ in range(10)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    tasks = [update_memory() for _ in range(10)]
+    await asyncio.gather(*tasks)
 
     # Memory should still be valid and updated
-    final = service.get_memory(db_session, memory.id, user_id)
+    final = await asyncio.to_thread(service.get_memory, db_session, memory.id, user_id)
     assert final is not None
     assert final.content == "updated"
 
 
-def test_concurrent_creates(service, db_session):
+@pytest.mark.asyncio
+async def test_concurrent_creates(service, db_session):
     """Test that concurrent creates generate unique IDs"""
     user_id = uuid4()
     results = []
 
-    def create_memory(index):
-        memory = service.create_memory(db_session, user_id, f"memory {index}")
+    async def create_memory(index):
+        memory = await asyncio.to_thread(service.create_memory, db_session, user_id, f"memory {index}")
         results.append(memory.id)
 
-    threads = [threading.Thread(target=create_memory, args=(i,)) for i in range(10)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    tasks = [create_memory(i) for i in range(10)]
+    await asyncio.gather(*tasks)
 
     # All IDs should be unique
     assert len(set(results)) == 10
 
 
-def test_concurrent_deletes(service, db_session):
+@pytest.mark.asyncio
+async def test_concurrent_deletes(service, db_session):
     """Test that concurrent deletes are handled safely"""
     user_id = uuid4()
-    memory = service.create_memory(db_session, user_id, "to delete")
+    memory = await asyncio.to_thread(service.create_memory, db_session, user_id, "to delete")
     results = []
 
-    def delete_memory():
-        result = service.delete_memory(db_session, memory.id, user_id)
+    async def delete_memory():
+        result = await asyncio.to_thread(service.delete_memory, db_session, memory.id, user_id)
         results.append(result)
 
-    threads = [threading.Thread(target=delete_memory) for _ in range(5)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    tasks = [delete_memory() for _ in range(5)]
+    await asyncio.gather(*tasks)
 
     # Only one delete should succeed
     assert sum(results) == 1

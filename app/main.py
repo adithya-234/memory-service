@@ -20,7 +20,7 @@ memory_service = MemoryService()
 
 
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     """Initialize database on startup."""
     init_db()
 
@@ -42,7 +42,7 @@ class SearchRequest(BaseModel):
 
 
 @app.get("/")
-def root():
+async def root():
     """Root endpoint returning service information."""
     return {
         "message": "Welcome to the Memory Service",
@@ -52,7 +52,7 @@ def root():
 
 
 @app.post("/memories", response_model=MemoryResponse)
-def create_memory_endpoint(
+async def create_memory_endpoint(
     memory: MemoryRequest,
     user_id: Annotated[UUID, Header()],
     db_session: Session = Depends(get_db)
@@ -69,7 +69,7 @@ def create_memory_endpoint(
 
 
 @app.get("/memories/{memory_id}", response_model=MemoryResponse)
-def get_memory_endpoint(
+async def get_memory_endpoint(
     memory_id: UUID,
     user_id: Annotated[UUID, Header()],
     db_session: Session = Depends(get_db)
@@ -89,7 +89,7 @@ def get_memory_endpoint(
 
 
 @app.put("/memories/{memory_id}", response_model=MemoryResponse)
-def update_memory_endpoint(
+async def update_memory_endpoint(
     memory_id: UUID,
     memory: MemoryRequest,
     user_id: Annotated[UUID, Header()],
@@ -109,7 +109,7 @@ def update_memory_endpoint(
 
 
 @app.post("/memories/search", response_model=list[MemoryResponse])
-def search_memories_endpoint(
+async def search_memories_endpoint(
     search: SearchRequest,
     user_id: Annotated[UUID, Header()],
     memory_id: Annotated[UUID, Header()],
@@ -135,7 +135,7 @@ def search_memories_endpoint(
 
 
 @app.delete("/memories/{memory_id}")
-def delete_memory_endpoint(
+async def delete_memory_endpoint(
     memory_id: UUID,
     user_id: Annotated[UUID, Header()],
     db_session: Session = Depends(get_db)

@@ -1,6 +1,6 @@
 import pytest
 import os
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from sqlalchemy.orm import sessionmaker
 from app.main import app, memory_service
 from app.database import engine, Base, get_db
@@ -32,13 +32,14 @@ def db_session():
 
 
 @pytest.fixture
-def client(db_session):
-    """Provide a test client."""
+async def client(db_session):
+    """Provide an async test client."""
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
     app.dependency_overrides.clear()
 
 
