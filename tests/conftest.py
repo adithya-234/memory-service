@@ -56,3 +56,9 @@ def client(db_session):
     app.dependency_overrides.clear()
 
 
+
+@pytest.fixture(autouse=True)
+def clear_memories_store():
+    yield
+    memory_service.clear_memories()
+

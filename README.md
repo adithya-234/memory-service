@@ -41,9 +41,38 @@ pip install -r requirements.txt
 
 ### Running the Application
 
+#### Using Python directly
 Start the FastAPI server:
 ```bash
 uvicorn app.main:app --reload
+```
+
+#### Using Docker
+Build and run the container:
+```bash
+docker build -t memory-service .
+docker run -p 8000:8000 memory-service
+```
+
+#### Using Make Commands
+Build the Docker image:
+```bash
+make build
+```
+
+Run the service locally:
+```bash
+make run-local
+```
+
+Stop the local service:
+```bash
+make stop-local
+```
+
+SSH into the running container:
+```bash
+make ssh-local
 ```
 
 
