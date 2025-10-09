@@ -1,9 +1,13 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
 from typing import Dict, Optional, Any, Annotated
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
-from memory_service import MemoryService, MemoryData
+from sqlalchemy.orm import Session
+from app.memory_service import MemoryData, MemoryService
+from app.database import get_db, engine
+from app import models
+
 
 
 VERSION = "1.0.0"
@@ -14,7 +18,8 @@ app = FastAPI(
     version=VERSION,
 )
 
-memory_service = MemoryService()
+# Create tables on startup
+models.Base.metadata.create_all(bind=engine)
 
 
 class MemoryRequest(BaseModel):
@@ -45,10 +50,14 @@ async def root():
 
 @app.post("/memories", response_model=MemoryResponse)
 async def create_memory_endpoint(
-    memory: MemoryRequest, user_id: Annotated[UUID, Header()]
+    memory: MemoryRequest,
+    user_id: Annotated[UUID, Header()],
+    db: Session = Depends(get_db)
 ):
     """Create a new memory for the user."""
+    memory_service = MemoryService(db)
     memory_data = memory_service.create_memory(user_id, memory.content)
+
     return MemoryResponse(
         id=memory_data.id,
         user_id=memory_data.user_id,
@@ -59,9 +68,11 @@ async def create_memory_endpoint(
 
 
 @app.get("/memories/{memory_id}", response_model=MemoryResponse)
-async def get_memory_endpoint(memory_id: UUID):
+async def get_memory_endpoint(memory_id: UUID, db: Session = Depends(get_db)):
     """Retrieve a memory by its ID."""
+    memory_service = MemoryService(db)
     memory_data = memory_service.get_memory(memory_id)
+
     if not memory_data:
         raise HTTPException(status_code=404, detail="Memory not found")
 
@@ -78,9 +89,11 @@ async def get_memory_endpoint(memory_id: UUID):
 async def update_memory_endpoint(
     memory_id: UUID,
     memory: MemoryRequest,
-    user_id: Annotated[UUID, Header()]
+    user_id: Annotated[UUID, Header()],
+    db: Session = Depends(get_db)
 ):
     """Update an existing memory's content."""
+    memory_service = MemoryService(db)
     memory_data = memory_service.update_memory(memory_id, memory.content, user_id)
     if not memory_data:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -95,9 +108,12 @@ async def update_memory_endpoint(
 
 @app.post("/memories/search", response_model=list[MemoryResponse])
 async def search_memories_endpoint(
-    search: SearchRequest, user_id: Annotated[UUID, Header()]
+    search: SearchRequest,
+    user_id: Annotated[UUID, Header()],
+    db: Session = Depends(get_db)
 ):
     """Search for memories matching the query."""
+    memory_service = MemoryService(db)
     memories = memory_service.search_memories(user_id, search.query)
     return [
         MemoryResponse(
@@ -114,9 +130,11 @@ async def search_memories_endpoint(
 @app.delete("/memories/{memory_id}")
 async def delete_memory_endpoint(
     memory_id: UUID,
-    user_id: Annotated[UUID, Header()]
+    user_id: Annotated[UUID, Header()],
+    db: Session = Depends(get_db)
 ):
     """Delete a memory."""
+    memory_service = MemoryService(db)
     deleted = memory_service.delete_memory(memory_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Memory not found")
