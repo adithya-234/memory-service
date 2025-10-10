@@ -2,8 +2,8 @@ from typing import Optional
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from dataclasses import dataclass
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 from database import MemoryModel
 
 
@@ -20,7 +20,7 @@ class MemoryData:
 class MemoryService:
     """Service for memory operations using PostgreSQL with SQLAlchemy."""
 
-    def create_memory(self, db_session: Session, user_id: UUID, content: str) -> MemoryData:
+    async def create_memory(self, db_session: AsyncSession, user_id: UUID, content: str) -> MemoryData:
         """Create a new memory."""
         memory_id = uuid4()
         now = datetime.now(timezone.utc)
@@ -34,8 +34,8 @@ class MemoryService:
         )
 
         db_session.add(db_memory)
-        db_session.commit()
-        db_session.refresh(db_memory)
+        await db_session.commit()
+        await db_session.refresh(db_memory)
 
         return MemoryData(
             id=db_memory.id,
@@ -45,12 +45,14 @@ class MemoryService:
             updated_at=db_memory.updated_at
         )
 
-    def get_memory(self, db_session: Session, memory_id: UUID, user_id: UUID) -> Optional[MemoryData]:
+    async def get_memory(self, db_session: AsyncSession, memory_id: UUID, user_id: UUID) -> Optional[MemoryData]:
         """Get a memory by ID with authorization check."""
-        db_memory = db_session.query(MemoryModel).filter(
+        stmt = select(MemoryModel).filter(
             MemoryModel.id == memory_id,
             MemoryModel.user_id == user_id
-        ).first()
+        )
+        result = await db_session.execute(stmt)
+        db_memory = result.scalar_one_or_none()
 
         if not db_memory:
             return None
@@ -63,12 +65,14 @@ class MemoryService:
             updated_at=db_memory.updated_at
         )
 
-    def update_memory(self, db_session: Session, memory_id: UUID, content: str, user_id: UUID) -> Optional[MemoryData]:
+    async def update_memory(self, db_session: AsyncSession, memory_id: UUID, content: str, user_id: UUID) -> Optional[MemoryData]:
         """Update an existing memory's content with authorization check."""
-        db_memory = db_session.query(MemoryModel).filter(
+        stmt = select(MemoryModel).filter(
             MemoryModel.id == memory_id,
             MemoryModel.user_id == user_id
-        ).first()
+        )
+        result = await db_session.execute(stmt)
+        db_memory = result.scalar_one_or_none()
 
         if not db_memory:
             return None
@@ -76,8 +80,8 @@ class MemoryService:
         db_memory.content = content
         db_memory.updated_at = datetime.now(timezone.utc)
 
-        db_session.commit()
-        db_session.refresh(db_memory)
+        await db_session.commit()
+        await db_session.refresh(db_memory)
 
         return MemoryData(
             id=db_memory.id,
@@ -87,15 +91,18 @@ class MemoryService:
             updated_at=db_memory.updated_at
         )
 
-    def search_memories(self, db_session: Session, user_id: UUID, query: str) -> list[MemoryData]:
+    async def search_memories(self, db_session: AsyncSession, user_id: UUID, query: str) -> list[MemoryData]:
         """Search user's memories using case-insensitive substring matching."""
         if not query or not query.strip():
             return []
 
-        db_memories = db_session.query(MemoryModel).filter(
+        stmt = select(MemoryModel).filter(
             MemoryModel.user_id == user_id,
             func.lower(MemoryModel.content).contains(query.lower())
-        ).order_by(MemoryModel.created_at.desc()).all()
+        ).order_by(MemoryModel.created_at.desc())
+
+        result = await db_session.execute(stmt)
+        db_memories = result.scalars().all()
 
         return [
             MemoryData(
@@ -108,17 +115,26 @@ class MemoryService:
             for mem in db_memories
         ]
 
-    def delete_memory(self, db_session: Session, memory_id: UUID, user_id: UUID) -> bool:
+    async def delete_memory(self, db_session: AsyncSession, memory_id: UUID, user_id: UUID) -> bool:
         """Delete a memory with authorization check."""
-        result = db_session.query(MemoryModel).filter(
+        stmt = select(MemoryModel).filter(
             MemoryModel.id == memory_id,
             MemoryModel.user_id == user_id
-        ).delete()
+        )
+        result = await db_session.execute(stmt)
+        db_memory = result.scalar_one_or_none()
 
-        db_session.commit()
-        return result > 0
+        if db_memory:
+            await db_session.delete(db_memory)
+            await db_session.commit()
+            return True
+        return False
 
-    def clear_memories(self, db_session: Session):
+    async def clear_memories(self, db_session: AsyncSession):
         """Clear all memories - useful for testing."""
-        db_session.query(MemoryModel).delete()
-        db_session.commit()
+        stmt = select(MemoryModel)
+        result = await db_session.execute(stmt)
+        memories = result.scalars().all()
+        for memory in memories:
+            await db_session.delete(memory)
+        await db_session.commit()
