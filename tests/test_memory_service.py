@@ -2,13 +2,11 @@ import pytest
 from uuid import uuid4
 
 
-@pytest.mark.asyncio
 async def test_home(client):
     resp = await client.get("/")
     assert resp.status_code == 200
 
 
-@pytest.mark.asyncio
 async def test_create_memory(client):
     data = {"content": "test memory"}
     user = str(uuid4())
@@ -19,7 +17,6 @@ async def test_create_memory(client):
     assert resp.json()["content"] == "test memory"
 
 
-@pytest.mark.asyncio
 async def test_get_memory(client):
     user = str(uuid4())
 
@@ -35,13 +32,11 @@ async def test_get_memory(client):
     assert resp.json()["content"] == "hello"
 
 
-@pytest.mark.asyncio
 async def test_memory_not_found(client):
     resp = await client.get(f"/memories/{uuid4()}")
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_search_memories(client):
     user = str(uuid4())
 
@@ -66,7 +61,6 @@ async def test_search_memories(client):
     assert any("pizza" in memory["content"].lower() for memory in results)
 
 
-@pytest.mark.asyncio
 async def test_search_memories_no_results(client):
     user = str(uuid4())
 
@@ -84,7 +78,6 @@ async def test_search_memories_no_results(client):
     assert len(results) == 0
 
 
-@pytest.mark.asyncio
 async def test_delete_memory(client):
     user = str(uuid4())
 
@@ -105,14 +98,12 @@ async def test_delete_memory(client):
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_delete_memory_not_found(client):
     user = str(uuid4())
     resp = await client.delete(f"/memories/{uuid4()}", headers={"user-id": user})
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_update_memory(client):
     """Test updating a memory"""
     user = str(uuid4())
@@ -134,7 +125,6 @@ async def test_update_memory(client):
     assert resp.json()["id"] == memory_id
 
 
-@pytest.mark.asyncio
 async def test_update_memory_not_found(client):
     """Test updating a non-existent memory"""
     user = str(uuid4())
@@ -147,7 +137,6 @@ async def test_update_memory_not_found(client):
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_update_memory_unauthorized(client):
     """Test that a user cannot update another user's memory"""
     user1 = str(uuid4())
@@ -173,7 +162,6 @@ async def test_update_memory_unauthorized(client):
     assert resp.json()["content"] == "user1's memory"
 
 
-@pytest.mark.asyncio
 async def test_delete_memory_unauthorized(client):
     """Test that a user cannot delete another user's memory"""
     user1 = str(uuid4())
@@ -194,7 +182,6 @@ async def test_delete_memory_unauthorized(client):
     assert resp.status_code == 200
 
 
-@pytest.mark.asyncio
 async def test_search_memories_empty_query(client):
     """Test that empty query returns empty list"""
     user = str(uuid4())
@@ -212,7 +199,6 @@ async def test_search_memories_empty_query(client):
     assert len(resp.json()) == 0
 
 
-@pytest.mark.asyncio
 async def test_search_memories_whitespace_query(client):
     """Test that whitespace-only query returns empty list"""
     user = str(uuid4())
@@ -230,7 +216,6 @@ async def test_search_memories_whitespace_query(client):
     assert len(resp.json()) == 0
 
 
-@pytest.mark.asyncio
 async def test_search_memories_case_insensitive(client):
     """Test that search is case insensitive"""
     user = str(uuid4())
@@ -249,7 +234,6 @@ async def test_search_memories_case_insensitive(client):
         assert len(resp.json()) == 1
 
 
-@pytest.mark.asyncio
 async def test_search_memories_special_characters(client):
     """Test search with special characters"""
     user = str(uuid4())
@@ -277,7 +261,6 @@ async def test_search_memories_special_characters(client):
     assert len(resp.json()) == 1
 
 
-@pytest.mark.asyncio
 async def test_search_memories_isolation(client):
     """Test that users can only search their own memories"""
     user1 = str(uuid4())
@@ -310,7 +293,6 @@ async def test_search_memories_isolation(client):
     assert len(resp.json()) == 0
 
 
-@pytest.mark.asyncio
 async def test_delete_memory_return_type(client):
     """Test that delete returns UUID not string"""
     user = str(uuid4())
