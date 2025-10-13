@@ -4,8 +4,8 @@ from typing import Dict, Optional, Any, Annotated
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
-from memory_service import MemoryService, MemoryData
-from database import get_db, init_db
+from app.memory_service import MemoryService, MemoryData
+from app.database import get_db, init_db
 
 
 VERSION = "1.0.0"
@@ -41,8 +41,27 @@ class SearchRequest(BaseModel):
     query: str
 
 
+def to_memory_response(memory: MemoryData) -> MemoryResponse:
+    """
+    Convert MemoryData to MemoryResponse.
+
+    Args:
+        memory: MemoryData instance
+
+    Returns:
+        MemoryResponse for API response
+    """
+    return MemoryResponse(
+        id=memory.id,
+        user_id=memory.user_id,
+        content=memory.content,
+        created_at=memory.created_at,
+        updated_at=memory.updated_at,
+    )
+
+
 @app.get("/")
-async def root():
+async def root() -> Dict[str, str]:
     """Root endpoint returning service information."""
     return {
         "message": "Welcome to the Memory Service",
@@ -59,13 +78,7 @@ async def create_memory_endpoint(
 ):
     """Create a new memory for the user."""
     memory_data = await memory_service.create_memory(db_session, user_id, memory.content)
-    return MemoryResponse(
-        id=memory_data.id,
-        user_id=memory_data.user_id,
-        content=memory_data.content,
-        created_at=memory_data.created_at,
-        updated_at=memory_data.updated_at,
-    )
+    return to_memory_response(memory_data)
 
 
 @app.get("/memories/{memory_id}", response_model=MemoryResponse)
@@ -79,13 +92,7 @@ async def get_memory_endpoint(
     if not memory_data:
         raise HTTPException(status_code=404, detail="Memory not found")
 
-    return MemoryResponse(
-        id=memory_data.id,
-        user_id=memory_data.user_id,
-        content=memory_data.content,
-        created_at=memory_data.created_at,
-        updated_at=memory_data.updated_at,
-    )
+    return to_memory_response(memory_data)
 
 
 @app.put("/memories/{memory_id}", response_model=MemoryResponse)
@@ -99,13 +106,7 @@ async def update_memory_endpoint(
     memory_data = await memory_service.update_memory(db_session, memory_id, memory.content, user_id)
     if not memory_data:
         raise HTTPException(status_code=404, detail="Memory not found")
-    return MemoryResponse(
-        id=memory_data.id,
-        user_id=memory_data.user_id,
-        content=memory_data.content,
-        created_at=memory_data.created_at,
-        updated_at=memory_data.updated_at,
-    )
+    return to_memory_response(memory_data)
 
 
 @app.post("/memories/search", response_model=list[MemoryResponse])
@@ -122,16 +123,7 @@ async def search_memories_endpoint(
         raise HTTPException(status_code=404, detail="Memory not found")
 
     memories = await memory_service.search_memories(db_session, user_id, search.query)
-    return [
-        MemoryResponse(
-            id=memory.id,
-            user_id=memory.user_id,
-            content=memory.content,
-            created_at=memory.created_at,
-            updated_at=memory.updated_at,
-        )
-        for memory in memories
-    ]
+    return [to_memory_response(memory) for memory in memories]
 
 
 @app.delete("/memories/{memory_id}")

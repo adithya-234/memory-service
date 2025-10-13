@@ -12,10 +12,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 ENV PYTHONPATH=/app
 
 # Copy application code
-COPY app/ ./
+COPY app/ ./app/
 
 # Expose port
 EXPOSE 8000
 
 # Run the application with hot reload for development
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

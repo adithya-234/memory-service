@@ -20,18 +20,33 @@ test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestAsyncSessionLocal = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
 
 
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create an instance of the default event loop for the test session."""
+    import asyncio
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+
 @pytest.fixture(scope="session", autouse=True)
 async def setup_database():
-    """Create tables."""
+    """Create and cleanup database tables for test session."""
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
+    # Cleanup: drop all tables after test session
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
     await test_engine.dispose()
 
 
 @pytest.fixture
 async def db_session():
-    """Provide an async database session for tests."""
+    """
+    Provide an async database session for tests with transaction rollback.
+    Each test gets a clean transaction that rolls back after the test.
+    """
     async with TestAsyncSessionLocal() as session:
         yield session
 

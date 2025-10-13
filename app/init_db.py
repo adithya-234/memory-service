@@ -1,13 +1,26 @@
 """Database initialization script."""
 import asyncio
-import time
 import sys
+import os
 from sqlalchemy import text
-from database import init_db, engine
+from app.database import init_db, engine
+
+# Configuration constants
+MAX_DB_RETRIES = int(os.getenv('MAX_DB_RETRIES', '30'))
+DB_RETRY_DELAY = int(os.getenv('DB_RETRY_DELAY', '2'))
 
 
-async def wait_for_db(max_retries=30, delay=2):
-    """Wait for database to be ready."""
+async def wait_for_db(max_retries=MAX_DB_RETRIES, delay=DB_RETRY_DELAY):
+    """
+    Wait for database to be ready by attempting connections.
+
+    Args:
+        max_retries: Maximum number of connection attempts (default from env: MAX_DB_RETRIES)
+        delay: Delay in seconds between retry attempts (default from env: DB_RETRY_DELAY)
+
+    Returns:
+        bool: True if database connection successful, False otherwise
+    """
     for i in range(max_retries):
         try:
             async with engine.begin() as conn:

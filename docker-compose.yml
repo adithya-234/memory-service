@@ -4,6 +4,7 @@ services:
     container_name: memory_postgres
     environment:
       POSTGRES_USER: postgres
+      # WARNING: Change this password in production! Use secrets management.
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: memory_db
     ports:
@@ -31,8 +32,8 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./app:/app
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+      - ./app:/app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 volumes:
   postgres_data:
