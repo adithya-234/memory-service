@@ -52,10 +52,17 @@ async def db_session():
 
 
 @pytest.fixture
-async def client(db_session):
-    """Provide an async test client."""
+def session_maker():
+    """Provide the session maker for tests that need multiple independent sessions."""
+    return TestAsyncSessionLocal
+
+
+@pytest.fixture
+async def client():
+    """Provide an async test client with fresh db sessions per request."""
     async def override_get_db():
-        yield db_session
+        async with TestAsyncSessionLocal() as session:
+            yield session
 
     app.dependency_overrides[get_db] = override_get_db
     async with AsyncClient(app=app, base_url="http://test") as ac:
@@ -64,7 +71,8 @@ async def client(db_session):
 
 
 @pytest.fixture(autouse=True)
-async def clear_data(db_session):
+async def clear_data():
     """Clear data after each test."""
     yield
-    await memory_service.clear_memories(db_session)
+    async with TestAsyncSessionLocal() as session:
+        await memory_service.clear_memories(session)

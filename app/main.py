@@ -113,15 +113,9 @@ async def update_memory_endpoint(
 async def search_memories_endpoint(
     search: SearchRequest,
     user_id: Annotated[UUID, Header()],
-    memory_id: Annotated[UUID, Header()],
     db_session: AsyncSession = Depends(get_db)
 ):
     """Search for memories matching the query."""
-    # Verify the memory exists and belongs to the user
-    memory_exists = await memory_service.get_memory(db_session, memory_id, user_id)
-    if not memory_exists:
-        raise HTTPException(status_code=404, detail="Memory not found")
-
     memories = await memory_service.search_memories(db_session, user_id, search.query)
     return [to_memory_response(memory) for memory in memories]
 
